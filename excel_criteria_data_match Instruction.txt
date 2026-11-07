@@ -4,18 +4,22 @@
 
 WHAT IT DOES
 ----------------------------------------------------------------
-Takes a column of amounts from one Excel sheet (the DATA source)
-and lines them up against the row layout of another Excel sheet
-(the REFERENCE source), by matching the label text in both (e.g.
-"TRADE DEBTORS", "TOTAL FIXED ASSETS"). It writes a new Excel
-file that mirrors the reference sheet's exact row order and
-spacing, with the matched amount next to each label — so the
-amount column can be copied straight into the real workbook.
+Takes one or more amount columns from an Excel sheet (the DATA
+source) and lines them up against the row layout of another
+Excel sheet (the REFERENCE source), by matching the label text in
+both (e.g. "TRADE DEBTORS", "TOTAL FIXED ASSETS"). It writes a new
+Excel file that mirrors the reference sheet's exact row order and
+spacing, with the matched amount(s) next to each label — so the
+amount column(s) can be copied straight into the real workbook.
 
 If the same label text repeats in a sheet (e.g. a section header
 and a later total that happen to share the same wording), it
 matches the 1st occurrence of that text to the 1st, the 2nd to
 the 2nd, and so on top to bottom — not just the first match.
+
+You can pull more than one DATA column in a single run (e.g.
+ACTUAL + BUDGET + VARIANCE together) instead of re-running the
+tool once per column.
 
 
 ----------------------------------------------------------------
@@ -36,9 +40,9 @@ The script lists every Excel file in the folder:
 
    Select REFERENCE source:
 
-      1 - OAP BS 202606.xls
-      2 - OAP PL 202606.xls
-      3 - OAP(consolidated) New & Old CP_AAA_202606_Fomulated.xlsx
+      [1] "OAP PL 202606.xls"
+      [2] "OAP(consolidated) New & Old CP_AAA_202606_Fomulated.xlsx"
+      [3] "PL_OAP matched 2606.xlsx"
 
    [#] to select
    [0] to exit
@@ -47,20 +51,21 @@ Type the file number and press Enter. Next, pick the sheet and
 the column that holds the reference labels, in the form
 <sheet number>_<column letter>:
 
-   Select REFERENCE [Criteria Sheet] [Criteria Col]
+   Select REFERENCE [Criteria Sheet]_[Criteria Col]
 
    Eg.: 4_F + [Enter]
 
-      1 - BS_Assets
-      2 - BS_L&E
-      3 - BS_AAA
-      4 - BS_OAP
+      [1] "FXCOLROWHIDES"
+      [2] "CSV_Conv.def"
+      ...
+      [13] "PL_OAP"
+      ...
 
    [#]_[Col] to select
    [0] to back
    [Enter] to exit
 
-Typing "4_F" means sheet 4 (BS_OAP), column F. [0] goes back to
+Typing "13_F" means sheet 13 (PL_OAP), column F. [0] goes back to
 the file list. Pressing [Enter] with nothing typed does NOT exit
 right away — it asks you to press [Enter] again to confirm, or
 [0] to go back, so a stray Enter key never closes the tool by
@@ -70,24 +75,52 @@ You'll then see a confirmation screen:
 
    Confirm REFERENCE source:
 
-      [OAP(consolidated) New & Old CP_AAA_202606_Fomulated.xlsx]
-      Sheet: [BS_OAP], Col: [F]
+      "OAP(consolidated) New & Old CP_AAA_202606_Fomulated.xlsx"
+      Sheet: [PL_OAP], Col: [F]
 
    [Enter] to Confirm
    [0] to reselect
 
 SELECTING THE DATA SOURCE
-Same idea, but you give TWO columns: the criteria column (the
-labels to match on) and the data column (the amounts), in the
-form <sheet number>_<criteria column>_<data column>:
+Same idea, but you give the criteria column (the labels to match
+on) PLUS one or more data columns (the amounts), in the form
+<sheet number>_<criteria column>_<data column(s)>:
 
-   Select DATA [Criteria Sheet] [Criteria Col] [Data Col]
+   Select DATA [Criteria Sheet]_[Criteria Col]_[Data Col(s)]
 
-   Eg.: 1_D_I + [Enter]
+   Eg.: 1_D_I        (one data col)
+        1_D_F:H      (range: F, G, H)
+        1_D_F,G,B    (list: F, G, B)
 
-      1 - BS DETAILED
+      [1] "P&L DETAILED"
 
-Typing "1_D_I" means sheet 1, criteria column D, data column I.
+   [#]_[Col]_[Col(s)] to select
+   [0] to back
+   [Enter] to exit
+
+The data-column part accepts:
+  - one letter          e.g. "I"       -> just column I
+  - a range             e.g. "F:H"     -> F, G, H (ascending only;
+                                          "H:F" is rejected — use a
+                                          list instead for custom order)
+  - a comma list        e.g. "F,G,B"   -> exactly F, then G, then B
+  - a mix of both       e.g. "F:H,B"   -> F, G, H, then B
+
+Output columns follow the order you typed, so a list lets you
+deliberately reorder (e.g. put last year before this year). The
+criteria column can't also appear as a data column, and repeating
+the same column twice is rejected.
+
+Typing "1_D_E:H" means sheet 1, criteria column D, data columns
+E, F, G, H — confirmed as:
+
+   Confirm DATA source:
+
+      "OAP PL 202606.xls"
+      Sheet: [P&L DETAILED], Criteria Col: [D], Data Cols: [E, F, G, H]
+
+   [Enter] to Confirm
+   [0] to reselect
 
 READING THE RESULTS
 After both sources are confirmed, the script reads both sheets,
@@ -95,7 +128,7 @@ matches them, and writes the output. You'll see a run report:
 
    Inputs: 2
       1. "<reference file>"!<sheet>  Col [<letter>]
-      2. "<data file>"!<sheet>  Criteria Col [<letter>], Data Col [<letter>]
+      2. "<data file>"!<sheet>  Criteria Col [<letter>], Data Cols [<letters>]
 
    Processing
    Reading reference ...
@@ -124,9 +157,10 @@ Two things can show up after "Outputs":
     for. Those amounts have nowhere to go in the output and are
     NOT included — they are listed instead on the output file's
     second sheet, "Data Overflow"
-    (Data Criteria | Data | Criteria Cell | Data Cell | Source),
-    so nothing silently goes missing. Check these rows manually
-    before relying on the output as complete.
+    (Criteria Cell | Data Criteria | Data Col [<letter>] for each
+    selected data column | Source), so nothing silently goes
+    missing. Check these rows manually before relying on the
+    output as complete.
 
 If either warning appears, you'll be offered:
 
@@ -140,10 +174,20 @@ OUTPUT FILES
 The output workbook is named "<reference sheet> matched <YYMM>.xlsx"
 when the data file's name contains a year+month (e.g. "202606"),
 or "Match Result_<reference sheet>_<today's date>.xlsx" otherwise.
-It has two sheets: "Matched" (column A = reference label, column B
-= matched amount, same row positions as the reference sheet) and,
-if anything overflowed, "Data Overflow". If a file of that name
-already exists, "_1", "_2" etc. is appended — nothing is overwritten.
+It has two sheets:
+
+  - "Matched" — row 1 is a header ("Reference_[<ref col letter>]"
+    in column A, then "Data_[<letter>]" for each selected data
+    column). From row 2 down, column A is the reference label and
+    the data columns hold the matched amount(s), at the SAME
+    relative row position as the reference sheet shifted down by
+    one (reference row 1 -> output row 2, and so on) — so when you
+    copy the value columns into your real workbook, skip row 1 and
+    the rows still line up.
+  - "Data Overflow" — only present if anything overflowed.
+
+If a file of that name already exists, "_1", "_2" etc. is
+appended — nothing is overwritten.
 
 
 ----------------------------------------------------------------
@@ -160,6 +204,10 @@ disambiguate a repeated label (e.g. a section header and a later
 total sharing the same wording) — there is no fuzzy matching, no
 case-insensitivity, and no attempt to match by row position
 instead of text. See build_data_lookup() / build_output_rows().
+Once a key matches, ALL of its selected data columns are pulled
+as a tuple — a blank cell in one of those columns stays blank in
+the output rather than being skipped, so column positions never
+drift relative to the header.
 
 Any DATA criteria-column occurrence that is never claimed by a
 REFERENCE row (lookup key not in used_keys) is "overflow" — see
@@ -167,13 +215,23 @@ find_overflow(). This is deliberately surfaced as an error rather
 than silently dropped, because it represents real amounts that
 would otherwise disappear from the output without any trace.
 
+DATA COLUMN SELECTOR PARSING
+The Data Col(s) token (range/list/mix) is expanded by
+parse_data_columns() into an ordered list of column letters before
+any reading happens — ranges must be ascending (column_index_from_
+string(start) <= end), otherwise it raises ValueError with a
+message telling the user to use a comma list instead. Duplicate
+columns and a criteria/data-column overlap are both rejected in
+prompt_select_sheet_cols_data() before the source is accepted.
+
 ROW RANGE
 The REFERENCE sheet's usable row range is 1..last row with a
 non-empty value in the criteria column; the DATA sheet's is
-1..last row with a non-empty value in EITHER the criteria or
-data column. This avoids dumping hundreds of blank trailing rows
-some workbooks report via max_row/nrows (openpyxl in particular
-can report a much larger max_row than the sheet's real content).
+1..last row with a non-empty value in the criteria column OR any
+selected data column. This avoids dumping hundreds of blank
+trailing rows some workbooks report via max_row/nrows (openpyxl in
+particular can report a much larger max_row than the sheet's real
+content).
 
 FILE READING
 .xls files are read with xlrd (the legacy format); .xlsx/.xlsm
@@ -187,19 +245,21 @@ openpyxl, xlrd (pywin32 is NOT required by this script, despite
 being used elsewhere in this environment).
 
 KNOWN LIMITATIONS
-  - Column letters in the selection codes (e.g. "4_F", "1_D_I")
-    are assumed to each be their own token, separated by
-    underscores — this was changed deliberately from an earlier
-    concatenated format ("4f", "1di") specifically to remove any
-    ambiguity for columns beyond Z (e.g. "AA"), at the cost of a
-    few extra keystrokes.
+  - Column letters in the selection codes (e.g. "4_F", "1_D_I",
+    "1_D_F:H") are assumed to each be their own token, separated
+    by underscores — this was changed deliberately from an
+    earlier concatenated format ("4f", "1di") specifically to
+    remove any ambiguity for columns beyond Z (e.g. "AA"), at the
+    cost of a few extra keystrokes.
   - No fuzzy/partial text matching — a label that's reworded
     between the two sheets will show up as unmatched/overflow
     rather than being matched anyway. This is intentional: silent
     fuzzy-matching on financial figures is a worse failure mode
     than an explicit warning.
-  - Only one REFERENCE column and one DATA criteria+data column
-    pair per run; no batch mode across multiple sheet pairs.
+  - Only one REFERENCE column and one DATA criteria column per
+    run (the DATA side's criteria column is always singular, even
+    though it can carry multiple data columns); no batch mode
+    across multiple sheet pairs.
 
 
 ----------------------------------------------------------------
@@ -244,6 +304,17 @@ pattern 4_F" (or "1_D_I")              - exactly as <sheet number>_<column
                                         - letter(s)>, underscore-separated,
                                         - e.g. "4_F" or "1_D_I" — not "4f" or
                                         - "4-F".
+
+"Invalid Input: range 'H:F' must be    - A range must go left-to-right
+ascending ..."                         - (low column to high column), e.g.
+                                        - "F:H". For a custom/reverse order,
+                                        - use a comma list instead, e.g. "H,G,F".
+
+"Invalid Input: criteria column [D]    - The same column letter was typed as
+cannot also be a data column" / "...   - both the criteria column and (one of)
+duplicate data column(s) ..."          - the data columns, or the same data
+                                        - column was listed twice. Re-check the
+                                        - selector code and remove the overlap.
 
 "ERROR - Data overflow" after a run    - Not a bug — the DATA sheet has more
                                         - occurrences of some label than the

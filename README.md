@@ -18,8 +18,11 @@ This tool does that matching for you and writes a ready-to-paste result.
    same labels + the column with the amounts).
 3. It matches every reference row to a data row by label text, and
    writes a new workbook that mirrors the reference sheet's exact row
-   order and spacing, with the matched amount in column B — so that
-   column can be copied straight into your real workbook.
+   order and spacing (shifted down by one row for a header), with the
+   matched amount(s) ready to copy straight into your real workbook.
+   You can pull more than one data column in a single run — a range
+   (`F:H`), a comma list (`F,G,B`), or a mix (`F:H,B`) — instead of
+   re-running the tool once per column.
 
 ## Why not just VLOOKUP?
 
