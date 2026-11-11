@@ -36,14 +36,18 @@ types are ignored). Run it with:
 (Use "python", not "py" — see TROUBLESHOOTING if that's unclear.)
 
 SELECTING THE REFERENCE SOURCE
-The script lists every Excel file in the folder:
+The script lists every Excel file in the folder. Every screen opens
+with a "====" line and every button/key block is set off by a
+"----" line, so each step has clear breathing room on screen:
 
+   ========================================================
    Select REFERENCE source:
 
       [1] "OAP PL 202606.xls"
       [2] "OAP(consolidated) New & Old CP_AAA_202606_Fomulated.xlsx"
       [3] "PL_OAP matched 2606.xlsx"
 
+   --------------------------------------------------------
    [#] to select
    [0] to exit
 
@@ -51,6 +55,7 @@ Type the file number and press Enter. Next, pick the sheet and
 the column that holds the reference labels, in the form
 <sheet number>_<column letter>:
 
+   ========================================================
    Select REFERENCE [Criteria Sheet]_[Criteria Col]
 
    Eg.: 4_F + [Enter]
@@ -61,6 +66,7 @@ the column that holds the reference labels, in the form
       [13] "PL_OAP"
       ...
 
+   --------------------------------------------------------
    [#]_[Col] to select
    [0] to back
    [Enter] to exit
@@ -73,11 +79,13 @@ accident.
 
 You'll then see a confirmation screen:
 
+   ========================================================
    Confirm REFERENCE source:
 
       "OAP(consolidated) New & Old CP_AAA_202606_Fomulated.xlsx"
       Sheet: [PL_OAP], Col: [F]
 
+   --------------------------------------------------------
    [Enter] to Confirm
    [0] to reselect
 
@@ -86,6 +94,7 @@ Same idea, but you give the criteria column (the labels to match
 on) PLUS one or more data columns (the amounts), in the form
 <sheet number>_<criteria column>_<data column(s)>:
 
+   ========================================================
    Select DATA [Criteria Sheet]_[Criteria Col]_[Data Col(s)]
 
    Eg.: 1_D_I        (one data col)
@@ -94,6 +103,7 @@ on) PLUS one or more data columns (the amounts), in the form
 
       [1] "P&L DETAILED"
 
+   --------------------------------------------------------
    [#]_[Col]_[Col(s)] to select
    [0] to back
    [Enter] to exit
@@ -114,11 +124,13 @@ the same column twice is rejected.
 Typing "1_D_E:H" means sheet 1, criteria column D, data columns
 E, F, G, H — confirmed as:
 
+   ========================================================
    Confirm DATA source:
 
       "OAP PL 202606.xls"
       Sheet: [P&L DETAILED], Criteria Col: [D], Data Cols: [E, F, G, H]
 
+   --------------------------------------------------------
    [Enter] to Confirm
    [0] to reselect
 
@@ -126,6 +138,7 @@ READING THE RESULTS
 After both sources are confirmed, the script reads both sheets,
 matches them, and writes the output. You'll see a run report:
 
+   ========================================================
    Inputs: 2
       1. "<reference file>"!<sheet>  Col [<letter>]
       2. "<data file>"!<sheet>  Criteria Col [<letter>], Data Cols [<letters>]
@@ -164,6 +177,7 @@ Two things can show up after "Outputs":
 
 If either warning appears, you'll be offered:
 
+   --------------------------------------------------------
    [Enter] to close...
    [0] save error log and close
 
@@ -214,6 +228,14 @@ REFERENCE row (lookup key not in used_keys) is "overflow" — see
 find_overflow(). This is deliberately surfaced as an error rather
 than silently dropped, because it represents real amounts that
 would otherwise disappear from the output without any trace.
+
+CONSOLE DIVIDERS
+_screen_break() ("=" * 56) opens every prompt screen; _options_
+break() ("-" * 56) sets off the button/key-line block at the
+bottom of each screen and before the final close prompt. Both are
+called explicitly at each site rather than folded into _print_
+heading(), since the run-report section needs the "=" break but
+has no single heading line to attach it to.
 
 DATA COLUMN SELECTOR PARSING
 The Data Col(s) token (range/list/mix) is expanded by

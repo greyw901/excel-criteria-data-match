@@ -2,3 +2,5 @@
 *.xlsm
 *.xls
 error log_*.txt
+__pycache__/
+*.exe

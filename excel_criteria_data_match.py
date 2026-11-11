@@ -41,6 +41,7 @@ os.chdir(SCRIPT_DIR)
 EXCEL_EXTENSIONS = (".xlsx", ".xlsm", ".xls")
 CURRENCY_FORMAT = '_(* #,##0.00_);_(* (#,##0.00);_(* "-"??_);_(@_)'
 LOG_PREFIX = "error log"
+DIVIDER_WIDTH = 56
 
 
 class UserCancelled(Exception):
@@ -161,6 +162,16 @@ def _print_heading(text: str) -> None:
     print()
 
 
+def _screen_break() -> None:
+    """Marks the start of a new screen -- every prompt loop opens with one."""
+    print("=" * DIVIDER_WIDTH)
+
+
+def _options_break() -> None:
+    """Marks the button/key-line block at the bottom of a screen."""
+    print("-" * DIVIDER_WIDTH)
+
+
 def _confirm_exit_or_back() -> Optional[bool]:
     """Blank [Enter] at a selection prompt asks for confirmation before exiting.
 
@@ -168,6 +179,7 @@ def _confirm_exit_or_back() -> Optional[bool]:
     to the file list, or None to re-show the original prompt.
     """
     print()
+    _options_break()
     print("[Enter] again to exit")
     print("[0] to go back")
     choice = input("> ").strip()
@@ -180,10 +192,12 @@ def _confirm_exit_or_back() -> Optional[bool]:
 
 def prompt_select_file(files: List[str], label: str) -> str:
     while True:
+        _screen_break()
         _print_heading(f"Select {label} source:")
         for i, name in enumerate(files, start=1):
             print(f'   [{i}] "{name}"')
         print()
+        _options_break()
         print("[#] to select")
         print("[0] to exit")
         choice = input("> ").strip()
@@ -201,12 +215,14 @@ def prompt_select_sheet_col(sheet_names: List[str], label: str) -> Optional[Tupl
     example = "4_F"
 
     while True:
+        _screen_break()
         _print_heading(f"Select {label} [Criteria Sheet]_[Criteria Col]")
         print(f"Eg.: {example} + [Enter]")
         print()
         for i, name in enumerate(sheet_names, start=1):
             print(f'   [{i}] "{name}"')
         print()
+        _options_break()
         print("[#]_[Col] to select")
         print("[0] to back")
         print("[Enter] to exit")
@@ -250,6 +266,7 @@ def prompt_select_sheet_cols_data(sheet_names: List[str], label: str) -> Optiona
     pattern = re.compile(r"^(\d+)_([A-Za-z]+)_([A-Za-z:,]+)$")
 
     while True:
+        _screen_break()
         _print_heading(f"Select {label} [Criteria Sheet]_[Criteria Col]_[Data Col(s)]")
         print("Eg.: 1_D_I        (one data col)")
         print("     1_D_F:H      (range: F, G, H)")
@@ -258,6 +275,7 @@ def prompt_select_sheet_cols_data(sheet_names: List[str], label: str) -> Optiona
         for i, name in enumerate(sheet_names, start=1):
             print(f'   [{i}] "{name}"')
         print()
+        _options_break()
         print("[#]_[Col]_[Col(s)] to select")
         print("[0] to back")
         print("[Enter] to exit")
@@ -317,6 +335,7 @@ def prompt_confirm_source(
     label: str, filename: str, sheet_name: str, cols: List[str]
 ) -> bool:
     while True:
+        _screen_break()
         _print_heading(f"Confirm {label} source:")
         print(f'   "{filename}"')
         if len(cols) == 1:
@@ -325,6 +344,7 @@ def prompt_confirm_source(
             data_cols_str = ", ".join(cols[1:])
             print(f'   Sheet: [{sheet_name}], Criteria Col: [{cols[0]}], Data Cols: [{data_cols_str}]')
         print()
+        _options_break()
         print("[Enter] to Confirm")
         print("[0] to reselect")
         choice = input("> ").strip()
@@ -533,9 +553,8 @@ def write_overflow_sheet(
 # ---------------------------------------------------------------------------
 
 def run() -> None:
-    print("=" * 56)
+    print("=" * DIVIDER_WIDTH)
     print(" Excel Criteria Matcher")
-    print("=" * 56)
 
     files = list_excel_files()
     if not files:
@@ -550,8 +569,8 @@ def run() -> None:
     n_data_cols = len(data_value_cols)
 
     start = time.time()
+    _screen_break()
     print()
-    print("-" * 56)
     print(f"Input & Output folder: \"{SCRIPT_DIR}\"")
     print()
     print("Inputs: 2")
@@ -603,7 +622,7 @@ def run() -> None:
 
     print()
     print(f"Elapsed: {elapsed:.1f}s")
-    print("-" * 56)
+    _options_break()
 
     if unmatched or overflow:
         print("[Enter] to close...")
