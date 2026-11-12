@@ -18,12 +18,12 @@ import time
 import traceback
 import warnings
 from collections import defaultdict
-from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
 import openpyxl
 import xlrd
 from openpyxl import Workbook
+from openpyxl.styles import Alignment, Font
 from openpyxl.utils import column_index_from_string, get_column_letter
 
 warnings.filterwarnings("ignore", message="Cannot parse header or footer")
@@ -38,14 +38,29 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(
 ))
 os.chdir(SCRIPT_DIR)
 
+TOOL_NAME = "Excel Criteria Matcher"
+VERSION = "v1.2_20261113"  # not shown on screen; goes into the exe version file
 EXCEL_EXTENSIONS = (".xlsx", ".xlsm", ".xls")
 CURRENCY_FORMAT = '_(* #,##0.00_);_(* (#,##0.00);_(* "-"??_);_(@_)'
-LOG_PREFIX = "error log"
 DIVIDER_WIDTH = 56
+MATCHED_SHEET = "Matched"
+UNMATCHED_SHEET = "Unmatched Reference"
+OVERFLOW_SHEET = "Data Overflow"
+WIDTH_MARGIN = 2
+MAX_TEXT_WIDTH = 60
+FIRST_CANCEL_STEP = 2  # [00] shows from the 3rd prompt screen on
+
+
+class GoBack(Exception):
+    """[0] Back - return to the previous screen."""
+
+
+class UserExit(Exception):
+    """[0] Exit at the first screen - close immediately, no screen."""
 
 
 class UserCancelled(Exception):
-    pass
+    """[00] Cancel & exit - show Cancelled. and pause before closing."""
 
 
 # ---------------------------------------------------------------------------
@@ -153,226 +168,253 @@ def parse_data_columns(spec: str) -> List[str]:
 
 
 # ---------------------------------------------------------------------------
-# Console prompts
+# Console screens
 # ---------------------------------------------------------------------------
 
-def _print_heading(text: str) -> None:
-    print()
-    print(text)
-    print()
+def clear_screen() -> None:
+    os.system("cls")
 
 
-def _screen_break() -> None:
-    """Marks the start of a new screen -- every prompt loop opens with one."""
+def print_banner() -> None:
     print("=" * DIVIDER_WIDTH)
-
-
-def _options_break() -> None:
-    """Marks the button/key-line block at the bottom of a screen."""
-    print("-" * DIVIDER_WIDTH)
-
-
-def _confirm_exit_or_back() -> Optional[bool]:
-    """Blank [Enter] at a selection prompt asks for confirmation before exiting.
-
-    Returns True to exit (UserCancelled raised by caller), False to go back
-    to the file list, or None to re-show the original prompt.
-    """
+    print(TOOL_NAME)
+    print("=" * DIVIDER_WIDTH)
     print()
-    _options_break()
-    print("[Enter] again to exit")
-    print("[0] to go back")
-    choice = input("> ").strip()
-    if choice == "":
-        return True
-    if choice == "0":
-        return False
-    return None
 
 
-def prompt_select_file(files: List[str], label: str) -> str:
+def open_screen(choices: List[str], error: Optional[str]) -> None:
+    """Clears the console and prints the screen's leading lines: banner, the
+    choices made so far, and the invalid-input notice from the previous try
+    (error None = no notice, "" = bare notice, text = notice with reason)."""
+    clear_screen()
+    print_banner()
+    if choices:
+        for line in choices:
+            print(line)
+        print()
+    if error is not None:
+        print(f"Error: Invalid Input - {error}" if error else "Error: Invalid Input")
+        print()
+
+
+def print_options(options: List[str]) -> None:
+    print()
+    print("-" * DIVIDER_WIDTH)
+    for line in options:
+        print(line)
+    print()
+
+
+def back_options(first_screen: bool, allow_cancel: bool) -> List[str]:
+    opts = ["[0] Exit" if first_screen else "[0] Back"]
+    if allow_cancel:
+        opts.append("[00] Cancel & exit")
+    return opts
+
+
+def read_choice(prompt: str, first_screen: bool, allow_cancel: bool) -> str:
+    """Reads one input line and handles the navigation keys: [00] is matched
+    on the whole input before any selection parsing; [0] backs out."""
+    raw = input(prompt).strip()
+    if allow_cancel and raw == "00":
+        raise UserCancelled()
+    if raw == "0":
+        raise UserExit() if first_screen else GoBack()
+    return raw
+
+
+def value_lines(pairs: List[Tuple[str, str]]) -> List[str]:
+    width = max(len(label) for label, _ in pairs)
+    return [f"{label.ljust(width)} : {value}" for label, value in pairs]
+
+
+def describe_reference(filename: str, sheet: Optional[str] = None,
+                       cols: Optional[List[str]] = None) -> str:
+    text = f'"{filename}"'
+    if sheet is not None:
+        text += f"!{sheet}, col {cols[0]}"
+    return text
+
+
+def describe_data(filename: str, sheet: Optional[str] = None,
+                  cols: Optional[List[str]] = None) -> str:
+    text = f'"{filename}"'
+    if sheet is not None:
+        text += f"!{sheet}, criteria col {cols[0]}, data cols {', '.join(cols[1:])}"
+    return text
+
+
+def prompt_select_file(files: List[str], label: str, choices: List[str],
+                       first_screen: bool, allow_cancel: bool) -> str:
+    error: Optional[str] = None
     while True:
-        _screen_break()
-        _print_heading(f"Select {label} source:")
+        open_screen(choices, error)
+        print(f"Select {label} source:")
+        print()
         for i, name in enumerate(files, start=1):
             print(f'   [{i}] "{name}"')
-        print()
-        _options_break()
-        print("[#] to select")
-        print("[0] to exit")
-        choice = input("> ").strip()
-        if choice == "0":
-            raise UserCancelled()
-        if choice.isdigit() and 1 <= int(choice) <= len(files):
-            return files[int(choice) - 1]
-        print()
-        print(f"Invalid Input: {choice!r} is not a valid selection")
+        print_options(["[#] Select"] + back_options(first_screen, allow_cancel))
+        raw = read_choice(f"{label.title()}: ", first_screen, allow_cancel)
+        if raw.isdigit() and 1 <= int(raw) <= len(files):
+            return files[int(raw) - 1]
+        error = ""
 
 
-def prompt_select_sheet_col(sheet_names: List[str], label: str) -> Optional[Tuple[int, List[str]]]:
+def prompt_select_sheet_col(sheet_names: List[str], choices: List[str],
+                            allow_cancel: bool) -> Tuple[str, List[str]]:
     """REFERENCE: sheet + exactly one label column."""
     pattern = re.compile(r"^(\d+)_([A-Za-z]+)$")
     example = "4_F"
+    error: Optional[str] = None
 
     while True:
-        _screen_break()
-        _print_heading(f"Select {label} [Criteria Sheet]_[Criteria Col]")
-        print(f"Eg.: {example} + [Enter]")
+        open_screen(choices, error)
+        print("Select REFERENCE sheet & col:")
+        print()
+        print(f"e.g. {example}")
         print()
         for i, name in enumerate(sheet_names, start=1):
             print(f'   [{i}] "{name}"')
-        print()
-        _options_break()
-        print("[#]_[Col] to select")
-        print("[0] to back")
-        print("[Enter] to exit")
-        raw = input("> ").strip()
+        print_options(["[#]_[Col] Select"] + back_options(False, allow_cancel))
+        raw = read_choice("Sheet & col: ", False, allow_cancel)
 
         if raw == "":
-            result = _confirm_exit_or_back()
-            if result is True:
-                raise UserCancelled()
-            if result is False:
-                return None
+            error = ""
             continue
-
-        if raw == "0":
-            return None
-
         m = pattern.match(raw)
         if not m:
-            print()
-            print(f"Invalid Input: {raw!r} does not match the pattern {example}")
+            error = f"{raw!r} does not match the pattern {example}"
             continue
-
         sheet_num = int(m.group(1))
-        col = m.group(2)
+        col = m.group(2).upper()
         if not (1 <= sheet_num <= len(sheet_names)):
-            print()
-            print(f"Invalid Input: sheet number {sheet_num} is out of range")
+            error = f"sheet number {sheet_num} is out of range"
             continue
         try:
-            column_index_from_string(col.upper())
+            column_index_from_string(col)
         except ValueError:
-            print()
-            print(f"Invalid Input: {raw!r} has an invalid column letter")
+            error = f"{raw!r} has an invalid column letter"
             continue
 
-        return sheet_num, [col.upper()]
+        return sheet_names[sheet_num - 1], [col]
 
 
-def prompt_select_sheet_cols_data(sheet_names: List[str], label: str) -> Optional[Tuple[int, List[str]]]:
+def prompt_select_sheet_cols_data(sheet_names: List[str], choices: List[str],
+                                  allow_cancel: bool) -> Tuple[str, List[str]]:
     """DATA: sheet + one criteria column + one or more data columns."""
     pattern = re.compile(r"^(\d+)_([A-Za-z]+)_([A-Za-z:,]+)$")
+    error: Optional[str] = None
 
     while True:
-        _screen_break()
-        _print_heading(f"Select {label} [Criteria Sheet]_[Criteria Col]_[Data Col(s)]")
-        print("Eg.: 1_D_I        (one data col)")
-        print("     1_D_F:H      (range: F, G, H)")
-        print("     1_D_F,G,B    (list: F, G, B)")
+        open_screen(choices, error)
+        print("Select DATA sheet & cols:")
+        print()
+        print("e.g. 1_D_I        one data col")
+        print("     1_D_F:H      range: F, G, H")
+        print("     1_D_F,G,B    list: F, G, B")
         print()
         for i, name in enumerate(sheet_names, start=1):
             print(f'   [{i}] "{name}"')
-        print()
-        _options_break()
-        print("[#]_[Col]_[Col(s)] to select")
-        print("[0] to back")
-        print("[Enter] to exit")
-        raw = input("> ").strip()
+        print_options(["[#]_[Col]_[Col(s)] Select"] + back_options(False, allow_cancel))
+        raw = read_choice("Sheet & cols: ", False, allow_cancel)
 
         if raw == "":
-            result = _confirm_exit_or_back()
-            if result is True:
-                raise UserCancelled()
-            if result is False:
-                return None
+            error = ""
             continue
-
-        if raw == "0":
-            return None
-
         m = pattern.match(raw)
         if not m:
-            print()
-            print(f"Invalid Input: {raw!r} does not match the pattern 1_D_F:H")
+            error = f"{raw!r} does not match the pattern 1_D_F:H"
             continue
-
         sheet_num = int(m.group(1))
         crit_col = m.group(2).upper()
         if not (1 <= sheet_num <= len(sheet_names)):
-            print()
-            print(f"Invalid Input: sheet number {sheet_num} is out of range")
+            error = f"sheet number {sheet_num} is out of range"
             continue
         try:
             column_index_from_string(crit_col)
         except ValueError:
-            print()
-            print(f"Invalid Input: {crit_col!r} is not a valid column letter")
+            error = f"{crit_col!r} is not a valid column letter"
             continue
-
         try:
             data_cols = parse_data_columns(m.group(3))
         except ValueError as e:
-            print()
-            print(f"Invalid Input: {e}")
+            error = str(e)
             continue
-
         if crit_col in data_cols:
-            print()
-            print(f"Invalid Input: criteria column [{crit_col}] cannot also be a data column")
+            error = f"criteria col {crit_col} cannot also be a data col"
             continue
         if len(set(data_cols)) != len(data_cols):
             dupes = sorted({c for c in data_cols if data_cols.count(c) > 1})
-            print()
-            print(f"Invalid Input: duplicate data column(s) {dupes}")
+            error = f"duplicate data col(s) {', '.join(dupes)}"
             continue
 
-        return sheet_num, [crit_col] + data_cols
+        return sheet_names[sheet_num - 1], [crit_col] + data_cols
 
 
-def prompt_confirm_source(
-    label: str, filename: str, sheet_name: str, cols: List[str]
-) -> bool:
+def prompt_confirm_source(label: str, details: List[str], choices: List[str]) -> None:
+    """Returns on [Enter]; raises GoBack on [0], UserCancelled on [00]."""
+    error: Optional[str] = None
     while True:
-        _screen_break()
-        _print_heading(f"Confirm {label} source:")
-        print(f'   "{filename}"')
-        if len(cols) == 1:
-            print(f'   Sheet: [{sheet_name}], Col: [{cols[0]}]')
-        else:
-            data_cols_str = ", ".join(cols[1:])
-            print(f'   Sheet: [{sheet_name}], Criteria Col: [{cols[0]}], Data Cols: [{data_cols_str}]')
+        open_screen(choices, error)
+        print(f"Confirm {label} source:")
         print()
-        _options_break()
-        print("[Enter] to Confirm")
-        print("[0] to reselect")
-        choice = input("> ").strip()
-        if choice == "":
-            return True
-        if choice == "0":
-            return False
-        print()
-        print(f"Invalid Input: {choice!r}")
+        for line in details:
+            print(f"   {line}")
+        print_options(["[Enter] Continue", "[0] Back", "[00] Cancel & exit"])
+        raw = read_choice("Ans: ", False, True)
+        if raw == "":
+            return
+        error = ""
 
 
-def select_source(files: List[str], label: str, mode: str) -> Tuple[str, str, List[str]]:
-    """mode: "single" for REFERENCE (one label column), "data" for DATA
-    (one criteria column + one or more data columns)."""
-    while True:
-        filename = prompt_select_file(files, label)
-        sheet_names = get_sheet_names(filename)
-        while True:
-            if mode == "single":
-                picked = prompt_select_sheet_col(sheet_names, label)
-            else:
-                picked = prompt_select_sheet_cols_data(sheet_names, label)
-            if picked is None:
-                break
-            sheet_num, cols = picked
-            sheet_name = sheet_names[sheet_num - 1]
-            if prompt_confirm_source(label, filename, sheet_name, cols):
-                return filename, sheet_name, cols
+def select_sources(files: List[str]) -> Tuple[str, str, List[str], str, str, List[str]]:
+    """Runs the six prompt screens as a step machine. GoBack is caught here,
+    and only here: it moves one step back. A confirm screen's choices block
+    leaves out the source being confirmed - its details are the screen body."""
+    s: Dict[str, object] = {}
+    step = 0
+    while step < 6:
+        allow_cancel = step >= FIRST_CANCEL_STEP
+        try:
+            if step == 0:
+                s["ref_file"] = prompt_select_file(files, "REFERENCE", [], True, allow_cancel)
+                s["ref_sheets"] = get_sheet_names(s["ref_file"])
+            elif step == 1:
+                choices = [f"Reference : {describe_reference(s['ref_file'])}"]
+                s["ref_sheet"], s["ref_cols"] = prompt_select_sheet_col(
+                    s["ref_sheets"], choices, allow_cancel)
+            elif step == 2:
+                details = value_lines([
+                    ("File", f'"{s["ref_file"]}"'),
+                    ("Sheet", f'"{s["ref_sheet"]}"'),
+                    ("Col", s["ref_cols"][0]),
+                ])
+                prompt_confirm_source("REFERENCE", details, [])
+            elif step == 3:
+                choices = [f"Reference : {describe_reference(s['ref_file'], s['ref_sheet'], s['ref_cols'])}"]
+                s["data_file"] = prompt_select_file(files, "DATA", choices, False, allow_cancel)
+                s["data_sheets"] = get_sheet_names(s["data_file"])
+            elif step == 4:
+                choices = value_lines([
+                    ("Reference", describe_reference(s["ref_file"], s["ref_sheet"], s["ref_cols"])),
+                    ("Data", describe_data(s["data_file"])),
+                ])
+                s["data_sheet"], s["data_cols"] = prompt_select_sheet_cols_data(
+                    s["data_sheets"], choices, allow_cancel)
+            elif step == 5:
+                choices = [f"Reference : {describe_reference(s['ref_file'], s['ref_sheet'], s['ref_cols'])}"]
+                details = value_lines([
+                    ("File", f'"{s["data_file"]}"'),
+                    ("Sheet", f'"{s["data_sheet"]}"'),
+                    ("Criteria col", s["data_cols"][0]),
+                    ("Data cols", ", ".join(s["data_cols"][1:])),
+                ])
+                prompt_confirm_source("DATA", details, choices)
+            step += 1
+        except GoBack:
+            step -= 1
+    return (s["ref_file"], s["ref_sheet"], s["ref_cols"],
+            s["data_file"], s["data_sheet"], s["data_cols"])
 
 
 # ---------------------------------------------------------------------------
@@ -443,10 +485,6 @@ def find_overflow(
     return overflow
 
 
-def format_vals(cols: List[str], vals: Tuple) -> str:
-    return ", ".join(f"{c}={v!r}" for c, v in zip(cols, vals))
-
-
 # ---------------------------------------------------------------------------
 # Output
 # ---------------------------------------------------------------------------
@@ -469,14 +507,51 @@ def build_output_filename(data_file: str, ref_sheet: str) -> str:
         yymm = m.group(1)[2:] + m.group(2)
         base = f"{ref_sheet} matched {yymm}"
     else:
-        base = f"Match Result_{ref_sheet}_{datetime.now():%Y%m%d}"
+        base = f"Match Result_{ref_sheet}_{time.strftime('%Y%m%d')}"
     return unique_path(base, ".xlsx")
+
+
+def display_len(value: object) -> int:
+    """Rendered length of a cell: numbers as their accounting-format string
+    (thousands separators, 2 decimals, padding/parentheses either side)."""
+    if value is None:
+        return 0
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return len(f"{abs(value):,.2f}") + 2
+    return len(str(value))
+
+
+def fit_width(values: List[object], cap: Optional[int] = None) -> int:
+    width = max((display_len(v) for v in values), default=0) + WIDTH_MARGIN
+    return min(width, cap) if cap else width
+
+
+def write_header_row(ws, headers: List[str]) -> None:
+    for col, header in enumerate(headers, start=1):
+        cell = ws.cell(row=1, column=col, value=header)
+        cell.font = Font(bold=True)
+        cell.alignment = Alignment(horizontal="center")
+
+
+def write_value(ws, row: int, col: int, value: object) -> None:
+    cell = ws.cell(row=row, column=col, value=value)
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        cell.number_format = CURRENCY_FORMAT
+
+
+def set_group_width(ws, first_col: int, columns: List[List[object]]) -> None:
+    """Same-quantity columns share one width: the max across all of them."""
+    width = max((fit_width(c) for c in columns), default=WIDTH_MARGIN)
+    for j in range(len(columns)):
+        ws.column_dimensions[get_column_letter(first_col + j)].width = width
 
 
 def write_output(
     path: str,
     output_rows: List[Tuple[int, object, Optional[Tuple]]],
+    unmatched: List[Tuple[int, str]],
     overflow: List[Tuple[int, str, Tuple]],
+    ref_file: str,
     data_file: str,
     ref_col: str,
     data_crit_col: str,
@@ -484,36 +559,56 @@ def write_output(
 ) -> None:
     wb = Workbook()
     ws = wb.active
-    ws.title = "Matched"
+    ws.title = MATCHED_SHEET
 
-    ws.cell(row=1, column=1, value=f"Reference_[{ref_col}]").font = openpyxl.styles.Font(bold=True)
-    for j, col_letter in enumerate(data_value_cols, start=2):
-        ws.cell(row=1, column=j, value=f"Data_[{col_letter}]").font = openpyxl.styles.Font(bold=True)
+    headers = [f"Reference_{ref_col}"] + [f"Data_{c}" for c in data_value_cols]
+    write_header_row(ws, headers)
 
-    max_len = 10
-    for _, raw, _ in output_rows:
-        if raw is not None:
-            max_len = max(max_len, len(str(raw)))
-    ws.column_dimensions["A"].width = min(60, max_len + 2)
-    for j in range(2, 2 + len(data_value_cols)):
-        ws.column_dimensions[get_column_letter(j)].width = 16
-
+    label_col: List[object] = [headers[0]]
+    value_cols: List[List[object]] = [[h] for h in headers[1:]]
     for row, raw, vals in output_rows:
         out_row = row + 1
         if raw is not None:
             ws.cell(row=out_row, column=1, value=raw)
+            label_col.append(raw)
         if vals is not None:
-            for j, v in enumerate(vals, start=2):
+            for j, v in enumerate(vals):
                 if v is None:
                     continue
-                cell = ws.cell(row=out_row, column=j, value=v)
-                if isinstance(v, (int, float)):
-                    cell.number_format = CURRENCY_FORMAT
+                write_value(ws, out_row, 2 + j, v)
+                value_cols[j].append(v)
 
+    ws.column_dimensions["A"].width = fit_width(label_col, MAX_TEXT_WIDTH)
+    set_group_width(ws, 2, value_cols)
+
+    if unmatched:
+        write_unmatched_sheet(wb, unmatched, ref_file, ref_col)
     if overflow:
         write_overflow_sheet(wb, overflow, data_file, data_crit_col, data_value_cols)
 
     wb.save(path)
+
+
+def write_unmatched_sheet(
+    wb: Workbook,
+    unmatched: List[Tuple[int, str]],
+    ref_file: str,
+    ref_col: str,
+) -> None:
+    ws = wb.create_sheet(UNMATCHED_SHEET)
+    headers = ["Reference Cell", "Reference Label", "Source"]
+    write_header_row(ws, headers)
+
+    source_name = os.path.splitext(os.path.basename(ref_file))[0]
+    cols: List[List[object]] = [[h] for h in headers]
+    for i, (row, text) in enumerate(unmatched, start=2):
+        values = [f"{ref_col}{row}", text, source_name]
+        for j, v in enumerate(values):
+            ws.cell(row=i, column=1 + j, value=v)
+            cols[j].append(v)
+
+    for j, values in enumerate(cols):
+        ws.column_dimensions[get_column_letter(1 + j)].width = fit_width(values, MAX_TEXT_WIDTH)
 
 
 def write_overflow_sheet(
@@ -523,60 +618,74 @@ def write_overflow_sheet(
     data_crit_col: str,
     data_value_cols: List[str],
 ) -> None:
-    ws = wb.create_sheet("Data Overflow")
-    headers = ["Criteria Cell", "Data Criteria"] + [f"Data Col [{c}]" for c in data_value_cols] + ["Source"]
-    for col, header in enumerate(headers, start=1):
-        cell = ws.cell(row=1, column=col, value=header)
-        cell.font = openpyxl.styles.Font(bold=True)
+    ws = wb.create_sheet(OVERFLOW_SHEET)
+    headers = (["Criteria Cell", "Data Criteria"]
+               + [f"Data Col {c}" for c in data_value_cols] + ["Source"])
+    write_header_row(ws, headers)
 
     source_name = os.path.splitext(os.path.basename(data_file))[0]
     n_val_cols = len(data_value_cols)
+    cell_col: List[object] = [headers[0]]
+    text_col: List[object] = [headers[1]]
+    value_cols: List[List[object]] = [[h] for h in headers[2:2 + n_val_cols]]
+    source_col: List[object] = [headers[-1]]
     for i, (row, text, vals) in enumerate(overflow, start=2):
         ws.cell(row=i, column=1, value=f"{data_crit_col}{row}")
         ws.cell(row=i, column=2, value=text)
+        cell_col.append(f"{data_crit_col}{row}")
+        text_col.append(text)
         for j, v in enumerate(vals):
-            cell = ws.cell(row=i, column=3 + j, value=v)
-            if isinstance(v, (int, float)):
-                cell.number_format = CURRENCY_FORMAT
+            write_value(ws, i, 3 + j, v)
+            value_cols[j].append(v)
         ws.cell(row=i, column=3 + n_val_cols, value=source_name)
+        source_col.append(source_name)
 
-    max_len = max((len(str(text)) for _, text, _ in overflow), default=10)
-    ws.column_dimensions["A"].width = 14
-    ws.column_dimensions["B"].width = min(60, max_len + 2)
-    for j in range(n_val_cols):
-        ws.column_dimensions[get_column_letter(3 + j)].width = 16
-    ws.column_dimensions[get_column_letter(3 + n_val_cols)].width = max(14, len(source_name) + 2)
+    ws.column_dimensions["A"].width = fit_width(cell_col)
+    ws.column_dimensions["B"].width = fit_width(text_col, MAX_TEXT_WIDTH)
+    set_group_width(ws, 3, value_cols)
+    ws.column_dimensions[get_column_letter(3 + n_val_cols)].width = fit_width(source_col)
 
 
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
-def run() -> None:
-    print("=" * DIVIDER_WIDTH)
-    print(" Excel Criteria Matcher")
+def close_pause() -> None:
+    print()
+    print("-" * DIVIDER_WIDTH)
+    input("[Enter] to close...")
 
+
+def run() -> None:
     files = list_excel_files()
     if not files:
-        print()
+        clear_screen()
+        print_banner()
         print("ERROR: no Excel files found in this folder")
+        close_pause()
         return
 
-    ref_file, ref_sheet, ref_cols = select_source(files, "REFERENCE", "single")
-    data_file, data_sheet, data_cols = select_source(files, "DATA", "data")
+    ref_file, ref_sheet, ref_cols, data_file, data_sheet, data_cols = select_sources(files)
     data_crit_col = data_cols[0]
     data_value_cols = data_cols[1:]
     n_data_cols = len(data_value_cols)
 
     start = time.time()
-    _screen_break()
+    clear_screen()
+    print_banner()
+    # Inputs lists files only (same file for both sources -> Inputs: 1); the
+    # sheet/col choices follow as value lines.
+    input_files = list(dict.fromkeys([ref_file, data_file]))
+    print(f"Inputs: {len(input_files)}")
+    for i, name in enumerate(input_files, start=1):
+        print(f'   {i}. "{name}"')
     print()
-    print(f"Input & Output folder: \"{SCRIPT_DIR}\"")
-    print()
-    print("Inputs: 2")
-    print(f"   1. \"{ref_file}\"!{ref_sheet}  Col [{ref_cols[0]}]")
-    print(f"   2. \"{data_file}\"!{data_sheet}  Criteria Col [{data_crit_col}], "
-          f"Data Cols [{', '.join(data_value_cols)}]")
+    for line in value_lines([
+        ("Reference sheet & col", f'"{ref_sheet}", {ref_cols[0]}'),
+        ("Data sheet & cols",
+         f'"{data_sheet}", criteria {data_crit_col}, data {", ".join(data_value_cols)}'),
+    ]):
+        print(line)
 
     print()
     print("Processing")
@@ -594,80 +703,43 @@ def run() -> None:
     lookup, key_row = build_data_lookup(data_rows, n_data_cols)
     output_rows, unmatched, used_keys = build_output_rows(ref_rows, lookup, ref_last)
     overflow = find_overflow(lookup, key_row, used_keys)
-    matched_count = sum(1 for _, raw, val in output_rows if val is not None)
+    matched_count = sum(1 for _, _, vals in output_rows if vals is not None)
     print(f"Matched : {matched_count}")
+    if unmatched:
+        print(f'Unmatched reference : {len(unmatched)}   (sheet "{UNMATCHED_SHEET}")')
+    if overflow:
+        print(f'Data overflow : {len(overflow)}   (sheet "{OVERFLOW_SHEET}")')
 
     print("Writing output ...")
     out_path = build_output_filename(data_file, ref_sheet)
-    write_output(out_path, output_rows, overflow, data_file, ref_cols[0], data_crit_col, data_value_cols)
+    write_output(out_path, output_rows, unmatched, overflow, ref_file, data_file,
+                 ref_cols[0], data_crit_col, data_value_cols)
 
     elapsed = time.time() - start
     print()
-    print(f"Outputs: 1")
+    print("Outputs: 1")
     print(f"   1. \"{os.path.basename(out_path)}\"")
-
-    if unmatched:
-        print()
-        print(f"Unmatched reference labels: {len(unmatched)}")
-        for i, (row, text) in enumerate(unmatched, start=1):
-            print(f"   {i}. \"{text}\" (row {row})")
-
-    if overflow:
-        print()
-        print(f"ERROR - Data overflow: {len(overflow)}")
-        print("   DATA has more occurrences of this criteria than REFERENCE has rows for it.")
-        print("   These amounts are NOT in the output and would be missed:")
-        for i, (row, text, vals) in enumerate(overflow, start=1):
-            print(f"   {i}. \"{text}\" (data row {row}) = {format_vals(data_value_cols, vals)}")
 
     print()
     print(f"Elapsed: {elapsed:.1f}s")
-    _options_break()
-
-    if unmatched or overflow:
-        print("[Enter] to close...")
-        print("[0] save error log and close")
-        choice = input("> ").strip()
-        if choice == "0":
-            save_report_log(unmatched, overflow, ref_file, ref_sheet, data_file, data_sheet, data_value_cols)
-    else:
-        input("[Enter] to close...")
-
-
-def save_report_log(
-    unmatched: List[Tuple[int, str]],
-    overflow: List[Tuple[int, str, Tuple]],
-    ref_file: str,
-    ref_sheet: str,
-    data_file: str,
-    data_sheet: str,
-    data_value_cols: List[str],
-) -> None:
-    path = unique_path(f"{LOG_PREFIX}_{datetime.now():%Y%m%d}", ".txt")
-    with open(path, "w", encoding="utf-8") as f:
-        f.write(f"Reference: \"{ref_file}\"!{ref_sheet}\n")
-        f.write(f"Data: \"{data_file}\"!{data_sheet}\n\n")
-        f.write(f"Unmatched reference labels: {len(unmatched)}\n")
-        for row, text in unmatched:
-            f.write(f"  row {row}: \"{text}\"\n")
-        f.write(f"\nData overflow (not carried into output): {len(overflow)}\n")
-        for row, text, vals in overflow:
-            f.write(f"  data row {row}: \"{text}\" = {format_vals(data_value_cols, vals)}\n")
-    print(f"Saved: \"{os.path.basename(path)}\"")
+    close_pause()
 
 
 def main() -> None:
     try:
         run()
+    except UserExit:
+        return
     except UserCancelled:
-        print()
+        clear_screen()
+        print_banner()
         print("Cancelled.")
-        input("[Enter] to close...")
+        close_pause()
     except Exception as e:
         print()
         print(f"ERROR: {type(e).__name__} - {e}")
         print(traceback.format_exc())
-        input("[Enter] to close...")
+        close_pause()
 
 
 if __name__ == "__main__":

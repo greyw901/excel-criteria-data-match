@@ -1,9 +1,12 @@
 ================================================================
-  excel_criteria_data_match.py — Instruction
+  Excel Criteria Data Match v1.2_20261113 — Instruction
 ================================================================
 
-WHAT IT DOES
 ----------------------------------------------------------------
+  FOR USERS
+----------------------------------------------------------------
+
+WHAT IT DOES
 Takes one or more amount columns from an Excel sheet (the DATA
 source) and lines them up against the row layout of another
 Excel sheet (the REFERENCE source), by matching the label text in
@@ -21,26 +24,44 @@ You can pull more than one DATA column in a single run (e.g.
 ACTUAL + BUDGET + VARIANCE together) instead of re-running the
 tool once per column.
 
-
-----------------------------------------------------------------
-  FOR USERS
-----------------------------------------------------------------
-
 GETTING STARTED
-Put excel_criteria_data_match.py in the same folder as the Excel
-files you want to match (.xlsx, .xlsm or .xls only — other file
-types are ignored). Run it with:
+Put excel_criteria_data_match.exe (or excel_criteria_data_match.py)
+in the same folder as the Excel files you want to match (.xlsx,
+.xlsm or .xls only — other file types are ignored). Double-click
+the .exe, or run the script with:
 
    python excel_criteria_data_match.py
 
 (Use "python", not "py" — see TROUBLESHOOTING if that's unclear.)
 
+The files can stay open in Excel — the tool only reads them — but
+save them first: it reads what is on disk, not unsaved edits.
+
+HOW THE SCREENS WORK
+The window is cleared for every step. Each screen starts with the
+tool's name in a ==== box, then what you have already chosen,
+then the question, a ---- line, the keys you can press, and the
+prompt where you type. Anything in [ ] is a key you press:
+
+   [Enter]  continue (on the confirm screens only)
+   [#]      pick from the list
+   [0]      back ONE screen ("[0] Exit" on the first screen closes
+            the window straight away)
+   [00]     cancel and close, from the 3rd screen on; shows
+            "Cancelled." and waits for [Enter] to close...
+
+If what you typed is not accepted, the same screen comes back with
+the reason just above the question, e.g.:
+
+   Error: Invalid Input - range 'H:F' must be ascending (e.g. F:H, not H:F) - use a comma list for custom order
+
 SELECTING THE REFERENCE SOURCE
-The script lists every Excel file in the folder. Every screen opens
-with a "====" line and every button/key block is set off by a
-"----" line, so each step has clear breathing room on screen:
+The script lists every Excel file in the folder:
 
    ========================================================
+   Excel Criteria Matcher
+   ========================================================
+
    Select REFERENCE source:
 
       [1] "OAP PL 202606.xls"
@@ -48,17 +69,24 @@ with a "====" line and every button/key block is set off by a
       [3] "PL_OAP matched 2606.xlsx"
 
    --------------------------------------------------------
-   [#] to select
-   [0] to exit
+   [#] Select
+   [0] Exit
+
+   Reference:
 
 Type the file number and press Enter. Next, pick the sheet and
 the column that holds the reference labels, in the form
 <sheet number>_<column letter>:
 
    ========================================================
-   Select REFERENCE [Criteria Sheet]_[Criteria Col]
+   Excel Criteria Matcher
+   ========================================================
 
-   Eg.: 4_F + [Enter]
+   Reference : "OAP(consolidated) New & Old CP_AAA_202606_Fomulated.xlsx"
+
+   Select REFERENCE sheet & col:
+
+   e.g. 4_F
 
       [1] "FXCOLROWHIDES"
       [2] "CSV_Conv.def"
@@ -67,46 +95,63 @@ the column that holds the reference labels, in the form
       ...
 
    --------------------------------------------------------
-   [#]_[Col] to select
-   [0] to back
-   [Enter] to exit
+   [#]_[Col] Select
+   [0] Back
+
+   Sheet & col:
 
 Typing "13_F" means sheet 13 (PL_OAP), column F. [0] goes back to
-the file list. Pressing [Enter] with nothing typed does NOT exit
-right away — it asks you to press [Enter] again to confirm, or
-[0] to go back, so a stray Enter key never closes the tool by
-accident.
+the file list. Pressing Enter with nothing typed is not accepted
+("Error: Invalid Input"), so a stray Enter never moves you on or
+closes the tool.
 
 You'll then see a confirmation screen:
 
    ========================================================
+   Excel Criteria Matcher
+   ========================================================
+
    Confirm REFERENCE source:
 
-      "OAP(consolidated) New & Old CP_AAA_202606_Fomulated.xlsx"
-      Sheet: [PL_OAP], Col: [F]
+      File  : "OAP(consolidated) New & Old CP_AAA_202606_Fomulated.xlsx"
+      Sheet : "PL_OAP"
+      Col   : F
 
    --------------------------------------------------------
-   [Enter] to Confirm
-   [0] to reselect
+   [Enter] Continue
+   [0] Back
+   [00] Cancel & exit
+
+   Ans:
 
 SELECTING THE DATA SOURCE
-Same idea, but you give the criteria column (the labels to match
-on) PLUS one or more data columns (the amounts), in the form
-<sheet number>_<criteria column>_<data column(s)>:
+Same idea: pick the file, then give the criteria column (the labels
+to match on) PLUS one or more data columns (the amounts), in the
+form <sheet number>_<criteria column>_<data column(s)>. [0] on the
+DATA file list goes back to the REFERENCE confirmation, so nothing
+already chosen is lost. The REFERENCE choice stays shown at the top:
 
    ========================================================
-   Select DATA [Criteria Sheet]_[Criteria Col]_[Data Col(s)]
+   Excel Criteria Matcher
+   ========================================================
 
-   Eg.: 1_D_I        (one data col)
-        1_D_F:H      (range: F, G, H)
-        1_D_F,G,B    (list: F, G, B)
+   Reference : "OAP(consolidated) New & Old CP_AAA_202606_Fomulated.xlsx"!PL_OAP, col F
+   Data      : "OAP PL 202606.xls"
+
+   Select DATA sheet & cols:
+
+   e.g. 1_D_I        one data col
+        1_D_F:H      range: F, G, H
+        1_D_F,G,B    list: F, G, B
 
       [1] "P&L DETAILED"
 
    --------------------------------------------------------
-   [#]_[Col]_[Col(s)] to select
-   [0] to back
-   [Enter] to exit
+   [#]_[Col]_[Col(s)] Select
+   [0] Back
+   [00] Cancel & exit
+
+   Sheet & cols:
 
 The data-column part accepts:
   - one letter          e.g. "I"       -> just column I
@@ -125,23 +170,39 @@ Typing "1_D_E:H" means sheet 1, criteria column D, data columns
 E, F, G, H — confirmed as:
 
    ========================================================
+   Excel Criteria Matcher
+   ========================================================
+
+   Reference : "OAP(consolidated) New & Old CP_AAA_202606_Fomulated.xlsx"!PL_OAP, col F
+
    Confirm DATA source:
 
-      "OAP PL 202606.xls"
-      Sheet: [P&L DETAILED], Criteria Col: [D], Data Cols: [E, F, G, H]
+      File         : "OAP PL 202606.xls"
+      Sheet        : "P&L DETAILED"
+      Criteria col : D
+      Data cols    : E, F, G, H
 
    --------------------------------------------------------
-   [Enter] to Confirm
-   [0] to reselect
+   [Enter] Continue
+   [0] Back
+   [00] Cancel & exit
+
+   Ans:
 
 READING THE RESULTS
 After both sources are confirmed, the script reads both sheets,
 matches them, and writes the output. You'll see a run report:
 
    ========================================================
+   Excel Criteria Matcher
+   ========================================================
+
    Inputs: 2
-      1. "<reference file>"!<sheet>  Col [<letter>]
-      2. "<data file>"!<sheet>  Criteria Col [<letter>], Data Cols [<letters>]
+      1. "<reference file>"
+      2. "<data file>"
+
+   Reference sheet & col : "<sheet>", <letter>
+   Data sheet & cols     : "<sheet>", criteria <letter>, data <letters>
 
    Processing
    Reading reference ...
@@ -150,55 +211,54 @@ matches them, and writes the output. You'll see a run report:
    Data rows : <n>
    Matching ...
    Matched : <n>
-
+   Unmatched reference : <n>   (sheet "Unmatched Reference")
+   Data overflow : <n>   (sheet "Data Overflow")
    Writing output ...
 
    Outputs: 1
       1. "<output file name>"
 
-UNDERSTANDING WARNINGS
-Two things can show up after "Outputs":
-
-  - "Unmatched reference labels" — a label exists in the
-    REFERENCE sheet but no matching text was found anywhere in
-    the DATA sheet. Usually means the two sheets' wording
-    doesn't line up exactly (a typo, a renamed line, a title
-    line), or the reference row genuinely has no amount.
-
-  - "ERROR - Data overflow" — the DATA sheet has MORE
-    occurrences of some label than the REFERENCE sheet has rows
-    for. Those amounts have nowhere to go in the output and are
-    NOT included — they are listed instead on the output file's
-    second sheet, "Data Overflow"
-    (Criteria Cell | Data Criteria | Data Col [<letter>] for each
-    selected data column | Source), so nothing silently goes
-    missing. Check these rows manually before relying on the
-    output as complete.
-
-If either warning appears, you'll be offered:
+   Elapsed: 0.3s
 
    --------------------------------------------------------
    [Enter] to close...
-   [0] save error log and close
 
-[0] saves a text file ("error log_YYYYMMDD.txt") listing every
-unmatched and overflow row, for a closer look later.
+The "Unmatched reference" and "Data overflow" lines only appear
+when there is something to report:
+
+  - Unmatched reference — a label exists in the REFERENCE sheet
+    but no matching text was found in the DATA sheet. Usually
+    means the two sheets' wording doesn't line up exactly (a
+    typo, a renamed line, a title line), or the reference row
+    genuinely has no amount. Listed on the output file's
+    "Unmatched Reference" sheet.
+
+  - Data overflow — the DATA sheet has MORE occurrences of some
+    label than the REFERENCE sheet has rows for. Those amounts
+    have nowhere to go on the "Matched" sheet — they are listed
+    on the output file's "Data Overflow" sheet instead, so nothing
+    silently goes missing. Check these rows manually before
+    relying on the output as complete.
 
 OUTPUT FILES
 The output workbook is named "<reference sheet> matched <YYMM>.xlsx"
 when the data file's name contains a year+month (e.g. "202606"),
 or "Match Result_<reference sheet>_<today's date>.xlsx" otherwise.
-It has two sheets:
+It has up to three sheets:
 
-  - "Matched" — row 1 is a header ("Reference_[<ref col letter>]"
-    in column A, then "Data_[<letter>]" for each selected data
+  - "Matched" — row 1 is a header ("Reference_<ref col letter>"
+    in column A, then "Data_<letter>" for each selected data
     column). From row 2 down, column A is the reference label and
     the data columns hold the matched amount(s), at the SAME
     relative row position as the reference sheet shifted down by
     one (reference row 1 -> output row 2, and so on) — so when you
     copy the value columns into your real workbook, skip row 1 and
     the rows still line up.
-  - "Data Overflow" — only present if anything overflowed.
+  - "Unmatched Reference" — only present if any reference label
+    found no match (Reference Cell | Reference Label | Source).
+  - "Data Overflow" — only present if anything overflowed
+    (Criteria Cell | Data Criteria | Data Col <letter> for each
+    selected data column | Source).
 
 If a file of that name already exists, "_1", "_2" etc. is
 appended — nothing is overwritten.
@@ -225,17 +285,34 @@ drift relative to the header.
 
 Any DATA criteria-column occurrence that is never claimed by a
 REFERENCE row (lookup key not in used_keys) is "overflow" — see
-find_overflow(). This is deliberately surfaced as an error rather
-than silently dropped, because it represents real amounts that
-would otherwise disappear from the output without any trace.
+find_overflow(). Overflow and unmatched reference labels are data
+exceptions, not script failures: each goes on its own sheet in the
+output workbook (written only when non-empty), and the run report
+shows only a count line pointing to that sheet. There is no error
+log for them — the output file itself is the record.
 
-CONSOLE DIVIDERS
-_screen_break() ("=" * 56) opens every prompt screen; _options_
-break() ("-" * 56) sets off the button/key-line block at the
-bottom of each screen and before the final close prompt. Both are
-called explicitly at each site rather than folded into _print_
-heading(), since the run-report section needs the "=" break but
-has no single heading line to attach it to.
+SCREENS AND NAVIGATION
+The six prompt screens (REFERENCE file, sheet & col, confirm; DATA
+file, sheet & cols, confirm) run as a step machine in
+select_sources(). Signals are exceptions:
+
+  Exception      Raised when                       Caught in
+  -------------  --------------------------------  ------------------
+  GoBack         [0] on any screen but the first   select_sources()
+                                                   -> one step back
+  UserExit       [0] on the first screen           main() -> returns,
+                                                   window closes
+  UserCancelled  [00] from the 3rd screen on       main() -> Cancelled.
+                                                   + [Enter] to close...
+
+read_choice() handles the navigation keys for every screen: [00] is
+matched on the whole input before any parsing, then [0]. Every
+screen starts with open_screen(choices, error): clear ("cls"),
+banner, the choices made so far, then the invalid-input notice.
+A confirm screen's choices block leaves out the source being
+confirmed — its details are the screen body. Invalid input sets
+the notice and loops; for the sheet & col screens the notice
+carries the specific reason (pattern, range, overlap, duplicate).
 
 DATA COLUMN SELECTOR PARSING
 The Data Col(s) token (range/list/mix) is expanded by
@@ -262,9 +339,31 @@ formula text. Both are read in full (not streaming) since these
 workbooks are at most ~1000 rows — not worth the added complexity
 of a streaming reader.
 
+OUTPUT FORMATTING
+The output is a new workbook, so openpyxl writes it from scratch.
+Header rows are bold and centred. Column widths are measured from
+the content (numbers by their formatted 1,234.56 length) plus a
+fixed margin (WIDTH_MARGIN); text columns are capped at
+MAX_TEXT_WIDTH. The amount columns on a sheet share one width so
+they read aligned.
+
 DEPENDENCIES
-openpyxl, xlrd (pywin32 is NOT required by this script, despite
-being used elsewhere in this environment).
+openpyxl, xlrd (pywin32 is NOT required by this script).
+
+VERSIONING
+v{major}.{minor}_{YYYYMMDD}. Update VERSION in the script,
+version_info.txt and this file together.
+
+PACKAGING
+Build from a clean venv so the exe only bundles what it needs:
+
+   python -m venv venv
+   venv\Scripts\pip install pyinstaller openpyxl xlrd
+   venv\Scripts\python -m PyInstaller --onefile --console ^
+     --version-file=version_info.txt excel_criteria_data_match.py
+
+version_info.txt embeds author/version into the exe's Properties >
+Details tab, so it travels with the exe when forwarded on its own.
 
 KNOWN LIMITATIONS
   - Column letters in the selection codes (e.g. "4_F", "1_D_I",
@@ -282,6 +381,9 @@ KNOWN LIMITATIONS
     run (the DATA side's criteria column is always singular, even
     though it can carry multiple data columns); no batch mode
     across multiple sheet pairs.
+  - Screen clearing uses the Windows "cls" command: it works in
+    cmd / PowerShell or when double-clicked, not in an IDE output
+    panel.
 
 
 ----------------------------------------------------------------
@@ -321,34 +423,34 @@ as "?" or garbled characters           - certain characters (e.g. Japanese
                                         - affect the console text, never the
                                         - Excel file written on disk.
 
-"Invalid Input: ... does not match the - The sheet+column code must be typed
-pattern 4_F" (or "1_D_I")              - exactly as <sheet number>_<column
+"Error: Invalid Input - ... does not   - The sheet+column code must be typed
+match the pattern 4_F" (or "1_D_F:H")  - exactly as <sheet number>_<column
                                         - letter(s)>, underscore-separated,
                                         - e.g. "4_F" or "1_D_I" — not "4f" or
                                         - "4-F".
 
-"Invalid Input: range 'H:F' must be    - A range must go left-to-right
-ascending ..."                         - (low column to high column), e.g.
+"Error: Invalid Input - range 'H:F'    - A range must go left-to-right
+must be ascending ..."                 - (low column to high column), e.g.
                                         - "F:H". For a custom/reverse order,
                                         - use a comma list instead, e.g. "H,G,F".
 
-"Invalid Input: criteria column [D]    - The same column letter was typed as
-cannot also be a data column" / "...   - both the criteria column and (one of)
-duplicate data column(s) ..."          - the data columns, or the same data
+"Error: Invalid Input - criteria col D - The same column letter was typed as
+cannot also be a data col" / "...      - both the criteria column and (one of)
+duplicate data col(s) ..."             - the data columns, or the same data
                                         - column was listed twice. Re-check the
                                         - selector code and remove the overlap.
 
-"ERROR - Data overflow" after a run    - Not a bug — the DATA sheet has more
+"Data overflow : n" in the run report  - Not a bug — the DATA sheet has more
                                         - occurrences of some label than the
                                         - REFERENCE sheet does. See the
                                         - "Data Overflow" sheet in the output
-                                        - file and the UNDERSTANDING WARNINGS
-                                        - section above.
+                                        - file and READING THE RESULTS above.
 
 
 ----------------------------------------------------------------
   CONTACT
 ----------------------------------------------------------------
 Author:       Yeoh Huey Sun
-Last updated: 2026-11-07
+Version:      v1.2_20261113
+Last updated: 2026-11-13
 ================================================================

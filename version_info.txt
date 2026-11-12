@@ -1,0 +1,41 @@
+# UTF-8
+#
+# PyInstaller version-info file for Excel Criteria Data Match.
+#
+# Use it when building the exe:
+#   pyinstaller --onefile --version-file=version_info.txt excel_criteria_data_match.py
+#
+# This embeds author/version info directly into the compiled .exe's
+# Windows Properties > Details tab. Unlike the docstring in the .py
+# source or the README/LICENSE in the repo, this travels WITH the
+# compiled binary even if it's forwarded on its own with no source
+# code or docs attached.
+
+VSVersionInfo(
+  ffi=FixedFileInfo(
+    filevers=(1, 2, 0, 0),
+    prodvers=(1, 2, 0, 0),
+    mask=0x3f,
+    flags=0x0,
+    OS=0x40004,
+    fileType=0x1,
+    subtype=0x0,
+    date=(0, 0)
+    ),
+  kids=[
+    StringFileInfo(
+      [
+      StringTable(
+        u'040904B0',
+        [StringStruct(u'CompanyName', u'Yeoh Huey Sun'),
+        StringStruct(u'FileDescription', u'Excel Criteria Data Match - line up DATA amounts against a REFERENCE layout by label occurrence'),
+        StringStruct(u'FileVersion', u'1.2_20261113'),
+        StringStruct(u'InternalName', u'Excel Criteria Data Match'),
+        StringStruct(u'LegalCopyright', u'Copyright (c) Yeoh Huey Sun'),
+        StringStruct(u'OriginalFilename', u'excel_criteria_data_match.exe'),
+        StringStruct(u'ProductName', u'Excel Criteria Data Match'),
+        StringStruct(u'ProductVersion', u'1.2_20261113')])
+      ]),
+    VarFileInfo([VarStruct(u'Translation', [1033, 1200])])
+  ]
+)

@@ -65,3 +65,10 @@ Full step-by-step walkthrough, output format, and troubleshooting:
 ## License
 
 MIT — see [LICENSE](LICENSE). Free to use, modify, and share.
+
+---
+Version: v1.2_20261113
+
+Author: Yeoh Huey Sun
+Email: greyw901@gmail.com
+GitHub: https://github.com/greyw901
